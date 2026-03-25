@@ -36,7 +36,7 @@ function showFormMessage(type, message) {
   // Preserve line breaks
   el.textContent = message;
 
-  // Bring message into view (nice UX after submit)
+  // Bring message into view
   el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -47,12 +47,6 @@ function clearFormMessage() {
   el.classList.add("hidden");
 }
 
-// Timestamp (for logging)
-function timestamp() {
-  const now = new Date();
-  return now.toISOString().replace("T", " ").replace("Z", "");
-}
-
 /**
  * Try to read JSON from the response.
  * If JSON is not available, return a best-effort object including raw text.
@@ -60,7 +54,6 @@ function timestamp() {
 async function readResponseBody(response) {
   const contentType = response.headers.get("content-type") || "";
 
-  // JSON is the expected format from our API
   if (contentType.includes("application/json")) {
     try {
       return await response.json();
@@ -69,7 +62,6 @@ async function readResponseBody(response) {
     }
   }
 
-  // Fallback: read as text
   const text = await response.text().catch(() => "");
   try {
     return JSON.parse(text);
@@ -79,12 +71,12 @@ async function readResponseBody(response) {
 }
 
 /**
- * Build a readable message for field validation errors returned by the API.
+ * Build a clearer message for validation errors returned by the API.
  * Expected format: { errors: [ { field, msg }, ... ] }
  */
 function buildValidationMessage(errors) {
   if (!Array.isArray(errors) || errors.length === 0) {
-    return "Validation failed. Please check your input fields.";
+    return "The resource could not be created because some fields contain invalid values.\n\nPlease review the form, correct the highlighted information, and try again.";
   }
 
   const lines = errors.map((e) => {
@@ -93,7 +85,11 @@ function buildValidationMessage(errors) {
     return `• ${field}: ${msg}`;
   });
 
-  return `Your request was blocked by server-side validation:\n\n${lines.join("\n")}`;
+  return `The resource could not be created because some fields contain invalid values.
+
+Please correct the following and try again:
+
+${lines.join("\n")}`;
 }
 
 /**
@@ -135,36 +131,37 @@ async function onSubmit(event) {
 
   try {
     clearFormMessage();
+
     const response = await fetch("/api/resources", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    // Always parse body (for both success and error cases)
     const body = await readResponseBody(response);
 
     // -----------------------------------------
     // Error handling by HTTP status
     // -----------------------------------------
     if (!response.ok) {
-      // 400 = server-side validation errors (we expect errors[])
+      // 400 = server-side validation errors
       if (response.status === 400) {
         const msg = buildValidationMessage(body?.errors);
         showFormMessage("error", msg);
         return;
       }
 
-      // 409 = duplicate resourceName (our new feature)
+      // 409 = duplicate resourceName
       if (response.status === 409) {
-        const msg =
-          body?.details ||
-          "A resource with the same name already exists. Please choose another name.";
-        showFormMessage("info", `Duplicate blocked (409):\n\n${msg}`);
+        const resourceName = payload.resourceName || "This resource";
+        const msg = `Resource "${resourceName}" already exists.
+
+Please choose a different resource name or check the existing resource list before trying again.`;
+        showFormMessage("info", msg);
         return;
       }
 
-      // Other errors (500, 404, etc.)
+      // Other errors
       showFormMessage("error", buildGenericErrorMessage(response.status, body));
       return;
     }
@@ -172,31 +169,30 @@ async function onSubmit(event) {
     // -----------------------------------------
     // Success handling (2xx)
     // -----------------------------------------
-    // We expect: { ok: true, data: {...} }
     const createdAtIso = body?.data?.created_at || "";
     const createdAt = createdAtIso
       ? createdAtIso.replace("T", " ").replace("Z", "")
       : "";
 
-    const msgLines = [];
-    msgLines.push(`Name ➡️ ${body?.data?.name ?? ""}`);
-    if (createdAt) msgLines.push(`Created at ➡️ ${createdAt}`);
-    msgLines.push(`ID in database ➡️ ${body?.data?.id ?? ""}`);
+    const msg = `Resource "${body?.data?.name}" was created successfully.
 
-    const msg = msgLines.join("\n");
+Resource ID: ${body?.data?.id}
+Created at: ${createdAt}`;
+
     showFormMessage("success", msg);
 
     // Notify UI layer (resources.js)
     if (typeof window.onResourceActionSuccess === "function") {
       window.onResourceActionSuccess({
         action: actionValue,
-        data: "success"
+        data: "success",
       });
     }
-
   } catch (err) {
-    // Network errors, CORS issues, server unreachable, etc.
     console.error("POST error:", err);
-    showFormMessage("error", "Network error: Could not reach the server. Check your environment and try again.");
+    showFormMessage(
+      "error",
+      "Network error: Could not reach the server. Check your environment and try again."
+    );
   }
 }

@@ -24,34 +24,6 @@ let resourceDescriptionValid = false
 let formMode = "create";
 
 // ===============================
-// Message display function
-// ===============================
-function showMessage(type, text) {
-    // Remove any existing message
-    const existingMsg = document.querySelector('.form-message');
-    if (existingMsg) existingMsg.remove();
-    
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `form-message p-4 mb-4 rounded-lg text-sm font-semibold ${
-        type === 'success' ? 'bg-green-100 text-green-700 border-l-4 border-green-600' :
-        type === 'duplicate' ? 'bg-yellow-100 text-yellow-700 border-l-4 border-yellow-600' :
-        type === 'validation' ? 'bg-orange-100 text-orange-700 border-l-4 border-orange-600' :
-        'bg-red-100 text-red-700 border-l-4 border-red-600'
-    }`;
-    msgDiv.textContent = text;
-    
-    const form = document.getElementById('resourceForm');
-    if (form) {
-        form.insertBefore(msgDiv, form.firstChild);
-    }
-    
-    // Auto-hide success messages after 5 seconds
-    if (type === 'success') {
-        setTimeout(() => msgDiv.remove(), 5000);
-    }
-}
-
-// ===============================
 // 2) Button creation helpers
 // ===============================
 
@@ -295,67 +267,6 @@ function clearResourceForm() {
 };
 
 // ===============================
-// Form submit handler
-// ===============================
-async function handleFormSubmit(event) {
-    event.preventDefault();
-    
-    const formData = {
-        action: 'create',
-        resourceName: document.getElementById('resourceName')?.value || '',
-        resourceDescription: document.getElementById('resourceDescription')?.value || '',
-        resourceAvailable: document.getElementById('resourceAvailable')?.checked || false,
-        resourcePrice: parseFloat(document.getElementById('resourcePrice')?.value) || 0,
-        resourcePriceUnit: document.querySelector('input[name="resourcePriceUnit"]:checked')?.value || 'hour'
-    };
-    
-    // Client-side validation
-    if (!formData.resourceName.trim()) {
-        showMessage('validation', '⚠️ Please enter a resource name');
-        return;
-    }
-    
-    if (!formData.resourcePrice || formData.resourcePrice <= 0) {
-        showMessage('validation', '⚠️ Please enter a valid price greater than 0');
-        return;
-    }
-    
-    try {
-        const response = await fetch('/api/resources', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            // Success
-            if (window.onResourceActionSuccess) {
-                window.onResourceActionSuccess({ action: 'create', data: 'success' });
-            }
-            showMessage('success', `✅ Resource "${formData.resourceName}" created successfully!`);
-            setTimeout(clearResourceForm, 1000);
-        } else if (response.status === 409) {
-            // Duplicate
-            showMessage('duplicate', `⛔ Resource "${formData.resourceName}" already exists! Please choose a different name.`);
-        } else if (response.status === 400) {
-            // Validation
-            const fields = data.errors ? data.errors.map(e => e.field).join(', ') : 'some fields';
-            showMessage('validation', `⚠️ Validation error: Please check ${fields}`);
-        } else {
-            // Other error
-            showMessage('error', `❌ Error: ${data.error || 'Something went wrong'}`);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        showMessage('error', '❌ Connection error. Please try again.');
-    }
-}
-
-// ===============================
 // 4) Bootstrapping
 // ===============================
 renderActionButtons(role);
@@ -373,9 +284,3 @@ window.onResourceActionSuccess = ({ action, data }) => {
     renderActionButtons(role);
   }
 };
-
-// Attach form submit handler
-const resourceForm = document.getElementById('resourceForm');
-if (resourceForm) {
-    resourceForm.addEventListener('submit', handleFormSubmit);
-}

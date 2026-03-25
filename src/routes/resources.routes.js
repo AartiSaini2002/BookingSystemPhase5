@@ -13,14 +13,6 @@ router.post("/", resourceValidators, async (req, res) => {
   // Validate input
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const fields = errors.array().map(e => e.path).join(', ');
-    await logEvent({
-      actorUserId: null,
-      message: `⚠️ VALIDATION_FAILED: Invalid fields - ${fields}`,
-      entityType: "resource",
-      entityId: null,
-    });
-    
     return res.status(400).json({
       ok: false,
       errors: errors.array().map((e) => ({ field: e.path, msg: e.msg })),
@@ -77,12 +69,12 @@ router.post("/", resourceValidators, async (req, res) => {
     const { rows } = await pool.query(insertSql, params);
 
     // Add log event
-    const resourceId = rows[0].id;
-    await logEvent({
-      actorUserId,
-      message: `✅ RESOURCE_CREATED: name="${resourceName}", price=${resourcePrice}, unit="${resourcePriceUnit}" - ID: ${resourceId}`,
-      entityType: "resource",
-      entityId: resourceId,
+const resourceId = rows[0].id;
+await logEvent({
+  actorUserId,
+  message: `RESOURCE_CREATED: name="${resourceName}", id=${resourceId}, price=${resourcePrice}, unit="${resourcePriceUnit}"`,
+  entityType: "resource",
+  entityId: resourceId,
     });
 
     return res.status(201).json({ ok: true, data: rows[0] });
@@ -93,7 +85,7 @@ router.post("/", resourceValidators, async (req, res) => {
       console.error(err);
       await logEvent({
         actorUserId,
-        message: `⛔ RESOURCE_CREATE_BLOCKED_DUPLICATE: name="${resourceName}" already exists (409 Conflict)`,
+        message: `RESOURCE_CREATE_BLOCKED_DUPLICATE: name="${resourceName}"`,
         entityType: "resource",
         entityId: null,
       });
