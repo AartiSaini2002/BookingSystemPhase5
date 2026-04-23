@@ -10,7 +10,7 @@ const role = "admin"; // "reserver" | "admin"
 // Will hold a reference to the Create button so we can enable/disable it
 let createButton = null;
 
-// Primay editing button
+// Primary editing button
 let primaryActionButton = null;
 
 // Used for clearing inputs
@@ -54,16 +54,12 @@ function setButtonEnabled(btn, enabled) {
 
   btn.disabled = !enabled;
 
-  // Keep disabled look in ONE place (here)
   btn.classList.toggle("cursor-not-allowed", !enabled);
   btn.classList.toggle("opacity-50", !enabled);
 
-  // Optional: remove hover feel when disabled (recommended UX)
   if (!enabled) {
     btn.classList.remove("hover:bg-brand-dark/80");
   } else {
-    // Only re-add if this button is supposed to have it
-    // (for Create we know it is)
     if (btn.value === "create" || btn.textContent === "Create") {
       btn.classList.add("hover:bg-brand-dark/80");
     }
@@ -110,19 +106,70 @@ function renderActionButtons(currentRole) {
   }
 }
 
-// ==========================================
+// ===============================
 // 3) Input creation + validation + clearing
-// ==========================================
+// ===============================
+
+// NEW: Add CSS for error highlighting (teacher's feedback)
+function addErrorStyles() {
+  if (document.getElementById('resource-error-styles')) return;
+  
+  const style = document.createElement('style');
+  style.id = 'resource-error-styles';
+  style.textContent = `
+    /* RED error styling for form.js messages */
+    .error-message-red {
+      background-color: #f8d7da !important;
+      border-left: 4px solid #dc3545 !important;
+      color: #721c24 !important;
+    }
+    
+    /* Field error styling */
+    .field-error-red {
+      border: 2px solid #dc3545 !important;
+      background-color: #fff8f8 !important;
+    }
+    
+    .error-text-red {
+      color: #dc3545;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      display: block;
+    }
+    
+    /* Success message styling */
+    .success-message-green {
+      background-color: #d4edda !important;
+      border-left: 4px solid #28a745 !important;
+      color: #155724 !important;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    #formMessage:not(.hidden) {
+      animation: slideIn 0.3s ease;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function createResourceNameInput(container) {
   const input = document.createElement("input");
 
-  // Core attributes
   input.id = "resourceName";
   input.name = "resourceName";
   input.type = "text";
   input.placeholder = "e.g., Meeting Room A";
 
-  // Base Tailwind styling (single source of truth)
   input.className = `
     mt-2 w-full rounded-2xl border border-black/10 bg-white
     px-4 py-3 text-sm outline-none
@@ -137,7 +184,6 @@ function createResourceNameInput(container) {
 function isResourceNameValid(value) {
   const trimmed = value.trim();
 
-  // Allowed characters: A–Z, a–z, 0–9, ä ö å, space, , . - (based on your current regex)
   const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ \,\.\-]+$/;
   const lengthValid = trimmed.length >= 5 && trimmed.length <= 30;
   const charactersValid = allowedPattern.test(trimmed);
@@ -147,14 +193,12 @@ function isResourceNameValid(value) {
 function createResourceDescriptionArea(container) {
   const textarea = document.createElement("textarea");
 
-  // Core attributes
   textarea.id = "resourceDescription";
   textarea.name = "resourceDescription";
   textarea.rows = 5;
   textarea.placeholder =
     "Describe location, capacity, included equipment, or any usage notes…";
 
-  // Base Tailwind styling (single source of truth)
   textarea.className = `
     mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
     focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 transition-all duration-200 ease-out
@@ -167,7 +211,6 @@ function createResourceDescriptionArea(container) {
 function isResourceDescriptionValid(value) {
   const trimmed = value.trim();
 
-  // Allowed characters: A–Z, a–z, 0–9, ä ö å, space, , . - (based on your current regex)
   const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ \,\.\-]+$/;
   const lengthValid = trimmed.length >= 10 && trimmed.length <= 50;
   const charactersValid = allowedPattern.test(trimmed);
@@ -175,7 +218,6 @@ function isResourceDescriptionValid(value) {
 }
 
 function setInputVisualState(input, state) {
-  // Reset to neutral base state (remove only our own validation-related classes)
   input.classList.remove(
     "border-green-500",
     "bg-green-100",
@@ -184,20 +226,33 @@ function setInputVisualState(input, state) {
     "bg-red-100",
     "focus:ring-red-500/30",
     "focus:border-brand-blue",
-    "focus:ring-brand-blue/30"
+    "focus:ring-brand-blue/30",
+    "field-error-red"  // Remove our custom red class if present
   );
 
-  // Ensure base focus style is present when neutral
-  // (If we are valid/invalid, we override ring color but keep ring behavior)
   input.classList.add("focus:ring-2");
 
   if (state === "valid") {
     input.classList.add("border-green-500", "bg-green-100", "focus:ring-green-500/30");
   } else if (state === "invalid") {
+    // Use RED for invalid (teacher's feedback)
     input.classList.add("border-red-500", "bg-red-100", "focus:ring-red-500/30");
   } else {
-    // neutral: keep base border/bg; nothing else needed
+    // neutral: keep base styling
   }
+}
+
+// NEW: Clear field errors from form.js messages
+function clearFieldErrors() {
+  const fields = ['resourceName', 'resourceDescription', 'resourcePrice'];
+  fields.forEach(field => {
+    const element = document.getElementById(field);
+    if (element) {
+      element.classList.remove('field-error-red');
+    }
+    const errorSpan = document.getElementById(`${field}-error`);
+    if (errorSpan) errorSpan.remove();
+  });
 }
 
 function attachResourceNameValidation(input) {
@@ -214,10 +269,7 @@ function attachResourceNameValidation(input) {
     setButtonEnabled(primaryActionButton, resourceNameValid && resourceDescriptionValid);
   };
 
-  // Real-time validation
   input.addEventListener("input", update);
-
-  // Initialize state on page load (Create disabled until valid)
   update();
 }
 
@@ -235,10 +287,7 @@ function attachResourceDescriptionValidation(input) {
     setButtonEnabled(primaryActionButton, resourceNameValid && resourceDescriptionValid);
   };
 
-  // Real-time validation
   input.addEventListener("input", update);
-
-  // Initialize state on page load (Create disabled until valid)
   update();
 }
 
@@ -264,11 +313,22 @@ function clearResourceForm() {
     defaultUnit.checked = true;
   }
   setButtonEnabled(createButton, false);
+  
+  // Clear any error messages and field highlights
+  clearFieldErrors();
+  const formMessage = document.getElementById("formMessage");
+  if (formMessage) {
+    formMessage.classList.add("hidden");
+  }
 };
 
 // ===============================
 // 4) Bootstrapping
 // ===============================
+
+// Add error styles first
+addErrorStyles();
+
 renderActionButtons(role);
 
 // Create + validate input
@@ -277,10 +337,98 @@ attachResourceNameValidation(resourceNameInput);
 const resourceDescriptionArea = createResourceDescriptionArea(resourceDescriptionCnt);
 attachResourceDescriptionValidation(resourceDescriptionArea);
 
-// From form.js
+// Override the showFormMessage function to use RED for errors (teacher's feedback)
+// This enhances the existing form.js function
+if (typeof window.showFormMessage === 'function') {
+  const originalShowFormMessage = window.showFormMessage;
+  window.showFormMessage = function(type, message, fieldErrors = null) {
+    const el = document.getElementById("formMessage");
+    if (!el) return;
+    
+    // Clear previous field errors
+    clearFieldErrors();
+    
+    // Base styling
+    el.className = "mt-6 rounded-2xl border px-4 py-3 text-sm whitespace-pre-line";
+    el.classList.remove("hidden");
+    
+    // Type-specific styling - ERROR uses RED (teacher's feedback)
+    if (type === "success") {
+      el.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-900");
+      el.textContent = "✅ " + message;
+    } else if (type === "info") {
+      el.classList.add("border-amber-200", "bg-amber-50", "text-amber-900");
+      el.textContent = "⚠️ " + message;
+    } else {
+      // ERROR - RED background and border (teacher's requirement)
+      el.classList.add("border-red-400", "bg-red-50", "text-red-800");
+      el.style.borderLeft = "4px solid #dc3545";
+      el.textContent = "❌ " + message;
+      
+      // Add "What to do next" for error messages
+      let nextAction = "";
+      const msgLower = message.toLowerCase();
+      if (msgLower.includes("already exists") || msgLower.includes("duplicate")) {
+        nextAction = "\n\n📋 What to do next: Please choose a different name or check the existing resources list.";
+      } else if (msgLower.includes("validation") || msgLower.includes("invalid")) {
+        nextAction = "\n\n📋 What to do next: Please fix the highlighted fields above and try again.";
+      } else if (msgLower.includes("network") || msgLower.includes("server")) {
+        nextAction = "\n\n📋 What to do next: Please check your connection and ensure the backend server is running.";
+      } else {
+        nextAction = "\n\n📋 What to do next: Please review your input and try again.";
+      }
+      el.textContent += nextAction;
+    }
+    
+    // Add field errors if provided
+    if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+      let errorList = "\n\nPlease fix the following:\n";
+      for (const [field, error] of Object.entries(fieldErrors)) {
+        const friendlyName = field === 'resourceName' ? 'Resource name' : 
+                            field === 'resourceDescription' ? 'Resource description' : 
+                            field === 'resourcePrice' ? 'Price' : field;
+        errorList += `\n• ${friendlyName}: ${error}`;
+        
+        // Highlight the field in RED
+        const element = document.getElementById(field);
+        if (element) {
+          element.classList.add('field-error-red');
+          let errorSpan = document.getElementById(`${field}-error`);
+          if (!errorSpan) {
+            errorSpan = document.createElement('span');
+            errorSpan.id = `${field}-error`;
+            errorSpan.className = 'error-text-red';
+            element.parentNode.insertBefore(errorSpan, element.nextSibling);
+          }
+          errorSpan.textContent = error;
+        }
+      }
+      el.textContent += errorList;
+    }
+    
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === "success") {
+      setTimeout(() => {
+        if (el && !el.classList.contains('hidden')) {
+          el.classList.add('hidden');
+        }
+      }, 5000);
+    }
+  };
+}
+
+// From form.js - MODIFIED to stay in CREATE mode
 window.onResourceActionSuccess = ({ action, data }) => {
   if (action === "create" && data === "success") {
-    formMode = "edit";
-    renderActionButtons(role);
+    // DO NOT switch to edit mode - stay in create mode
+    // formMode = "edit";
+    // renderActionButtons(role);
+    
+    // Optional: Auto-clear the form for the next entry
+    setTimeout(() => {
+      clearResourceForm();
+    }, 1000);
   }
 };
